@@ -18,6 +18,7 @@
 			#include "DistanceFunc.cginc"
 			
 			uniform sampler2D _CameraDepthTexture;
+			uniform float4x4 _CameraModelView;
 			uniform float4x4 _CameraClipToWorld;
 			// These three are set by our script (see RaymarchGeneric.cs)
 			uniform sampler2D _MainTex;
@@ -53,7 +54,8 @@
 				o.uv.y = 1 - o.uv.y;
 				#endif
 
-				o.ray = _FrustumCornersWS[(int)index];
+				o.ray = normalize(_FrustumCornersWS[(int)index]);
+				o.ray /= o.ray.z;
 
 				return o;
 			}
@@ -118,11 +120,8 @@
 				#endif
 
 				// Convert from depth buffer to true distance from camera
-				float depth = tex2D(_CameraDepthTexture, duv).r;
-				float4 projPos = float4(duv.x * 2 - 1, duv.y * 2 - 1, depth * 2 - 1, 1.0f);
-				float4 posvs = mul(_CameraClipToWorld, projPos);
-				posvs /= posvs.w;
-				depth = length(posvs.xyz - ro);
+				float depth = LinearEyeDepth(tex2D(_CameraDepthTexture, duv).r);
+				depth *= length(i.ray);
 
 				fixed3 col = tex2D(_MainTex,i.uv);
 				fixed4 add = raymarch(ro, rd, depth);

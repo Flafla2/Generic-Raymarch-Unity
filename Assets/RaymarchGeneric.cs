@@ -65,6 +65,7 @@ public class RaymarchGeneric : MonoBehaviour
         EffectMaterial.SetMatrix("_FrustumCornersWS", GetFrustumCorners(CurrentCamera));
         EffectMaterial.SetVector("_CameraWS", CurrentCamera.transform.position);
         EffectMaterial.SetMatrix("_CameraClipToWorld", (CurrentCamera.projectionMatrix * CurrentCamera.worldToCameraMatrix).inverse);
+        EffectMaterial.SetMatrix("_CameraModelView", CurrentCamera.worldToCameraMatrix * transform.localToWorldMatrix);
 
         CustomGraphicsBlit(source, destination, EffectMaterial, 0);
     }
