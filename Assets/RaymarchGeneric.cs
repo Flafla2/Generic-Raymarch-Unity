@@ -43,7 +43,7 @@ public class RaymarchGeneric : MonoBehaviour
         Matrix4x4 corners = GetFrustumCorners(CurrentCamera);
         Vector3 pos = CurrentCamera.transform.position;
 
-        for(int x=0;x<4;x++)
+        for (int x = 0; x < 4; x++)
             Gizmos.DrawLine(pos, pos + (Vector3)corners.GetRow(x));
     }
 
@@ -52,7 +52,7 @@ public class RaymarchGeneric : MonoBehaviour
     {
         if (!EffectMaterial)
         {
-            Graphics.Blit(source, destination);
+            Graphics.Blit(source, destination); // do nothing
             return;
         }
 
@@ -63,16 +63,15 @@ public class RaymarchGeneric : MonoBehaviour
         EffectMaterial.SetVector("_LightDir", SunLight ? SunLight.forward : Vector3.down);
 
         EffectMaterial.SetMatrix("_FrustumCornersWS", GetFrustumCorners(CurrentCamera));
+        EffectMaterial.SetMatrix("_CameraInvViewMatrix", CurrentCamera.cameraToWorldMatrix);
         EffectMaterial.SetVector("_CameraWS", CurrentCamera.transform.position);
-        EffectMaterial.SetMatrix("_CameraClipToWorld", (CurrentCamera.projectionMatrix * CurrentCamera.worldToCameraMatrix).inverse);
-        EffectMaterial.SetMatrix("_CameraModelView", CurrentCamera.worldToCameraMatrix * transform.localToWorldMatrix);
 
         CustomGraphicsBlit(source, destination, EffectMaterial, 0);
     }
 
     /// \brief Stores the normalized rays representing the camera frustum in a 4x4 matrix.  Each row is a vector.
     /// 
-    /// The following rays are stored in each row (in worldspace, not cameraspace):
+    /// The following rays are stored in each row (in eyespace, not worldspace):
     /// Top Left corner:     row=0
     /// Top Right corner:    row=1
     /// Bottom Right corner: row=2
@@ -90,20 +89,14 @@ public class RaymarchGeneric : MonoBehaviour
         float fovWHalf = camFov * 0.5f;
 
         float tan_fov = Mathf.Tan(fovWHalf * Mathf.Deg2Rad);
-        Vector3 toRight = camtr.right * camNear * tan_fov * camAspect;
-        Vector3 toTop = camtr.up * camNear * tan_fov;
 
-        Vector3 topLeft = (camtr.forward * camNear - toRight + toTop);
-        topLeft.Normalize();
+        Vector3 toRight = Vector3.right * camNear * tan_fov * camAspect;
+        Vector3 toTop = Vector3.up * camNear * tan_fov;
 
-        Vector3 topRight = (camtr.forward * camNear + toRight + toTop);
-        topRight.Normalize();
-
-        Vector3 bottomRight = (camtr.forward * camNear + toRight - toTop);
-        bottomRight.Normalize();
-
-        Vector3 bottomLeft = (camtr.forward * camNear - toRight - toTop);
-        bottomLeft.Normalize();
+        Vector3 topLeft = (-Vector3.forward * camNear - toRight + toTop);
+        Vector3 topRight = (-Vector3.forward * camNear + toRight + toTop);
+        Vector3 bottomRight = (-Vector3.forward * camNear + toRight - toTop);
+        Vector3 bottomLeft = (-Vector3.forward * camNear - toRight - toTop);
 
         frustumCorners.SetRow(0, topLeft);
         frustumCorners.SetRow(1, topRight);
@@ -130,12 +123,15 @@ public class RaymarchGeneric : MonoBehaviour
         fxMaterial.SetTexture("_MainTex", source);
 
         GL.PushMatrix();
-        GL.LoadOrtho(); // Note: z value of vertices don't make a difference!
+        GL.LoadOrtho(); // Note: z value of vertices don't make a difference because we are using ortho projection
 
         fxMaterial.SetPass(passNr);
 
         GL.Begin(GL.QUADS);
 
+        // Here, GL.MultitexCoord2(0, x, y) assigns the value (x, y) to the TEXCOORD0 slot in the shader.
+        // GL.Vertex3(x,y,z) queues up a vertex at position (x, y, z) to be drawn.  Note that we are storing
+        // our own custom frustum information in the z coordinate.
         GL.MultiTexCoord2(0, 0.0f, 0.0f);
         GL.Vertex3(0.0f, 0.0f, 3.0f); // BL
 

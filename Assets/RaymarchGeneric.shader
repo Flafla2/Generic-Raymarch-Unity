@@ -18,10 +18,9 @@
 			#include "DistanceFunc.cginc"
 			
 			uniform sampler2D _CameraDepthTexture;
-			uniform float4x4 _CameraModelView;
-			uniform float4x4 _CameraClipToWorld;
 			// These three are set by our script (see RaymarchGeneric.cs)
 			uniform sampler2D _MainTex;
+			uniform float4x4 _CameraInvViewMatrix;
 			uniform float4x4 _FrustumCornersWS;
 			uniform float4 _CameraWS;
 			uniform float3 _LightDir;
@@ -37,13 +36,14 @@
 			{
 				float4 pos : SV_POSITION;
 				float2 uv : TEXCOORD0;
-				float4 ray : TEXCOORD1;
+				float3 ray : TEXCOORD1;
 			};
 
 			v2f vert (appdata v)
 			{
 				v2f o;
 				
+				// Index passed via custom blit function in RaymarchGeneric.cs
 				half index = v.vertex.z;
 				v.vertex.z = 0.1;
 				
@@ -54,14 +54,47 @@
 				o.uv.y = 1 - o.uv.y;
 				#endif
 
-				o.ray = normalize(_FrustumCornersWS[(int)index]);
-				o.ray /= o.ray.z;
+				// Get the eyespace view ray
+				o.ray = normalize(_FrustumCornersWS[(int)index].xyz);
+				o.ray /= -o.ray.z;
+
+				// Transform from eyespace to worldspace
+				float4 ray_ws = float4(o.ray, 1.0);
+				ray_ws = mul(ray_ws, _CameraInvViewMatrix);
+				o.ray = ray_ws.xyz;
+
+				
 
 				return o;
 			}
 
+			// Basic transformation matrices.  We are dealing with length-3 vectors here,
+			// so we can't fully define a tranlation matrix (you could only translate in x and y)
+			// so if you want to move something simply add to/subtract from the input coordinates.
+			// s_t: sin(theta)
+			// c_t: cos(theta)
+			#define MAT_ROT_X(s_t, c_t) float3x3(1,0,0, 0,c_t,-s_t, 0,s_t,c_t)
+			#define MAT_ROT_Y(s_t, c_t) float3x3(c_t,0,s_t, 0,1,0, -s_t,0,c_t)
+			#define MAT_ROT_Z(s_t, c_t) float3x3(c_t,-s_t,0, s_t,c_t,0, 0,0,1)
+			#define MAT_SCL(x, y, z) float3x3(x,0,0, 0,y,0, 0,0,z)
+
+			// This is the distance field function.  The distance field represents the closest distance to the surface
+			// of any object we put in the scene.  If the given point (point p) is inside of an object, we return a
+			// negative answer.
 			float map(float3 p) {
-				return sdTorus(p - float3(_Time.y,0,0), float2(1, 0.2));
+				float sin_time = sin(_Time.y);
+				float cos_time = cos(_Time.y);
+
+				// Note: You want to apply your operations in reverse order.  Remember: you aren't transforming
+				// the object itself - you are transforming a point with which you will sample the object (located
+				// at the origin).  So you want to work "backwards" towards the object.
+
+				float3 torus_point = p;
+				torus_point.x -= sin_time * 3; // translate back and forth
+				torus_point = mul(MAT_ROT_Y(sin_time, cos_time), torus_point); // Rotate about local y axis
+				torus_point = mul(MAT_ROT_X(sin_time, cos_time), torus_point); // Rotate about local x axis
+				
+				return sdTorus(torus_point, float2(1, 0.2));
 			}
 
 			float3 calcNormal(in float3 pos)
@@ -88,20 +121,27 @@
 				const int maxstep = 64;
 				float t = 0; // current distance traveled along ray
 				for (int i = 0; i < maxstep; ++i) {
-					if (t > s) {
+					// If we run past the depth buffer, stop and return nothing (transparent pixel)
+					// this way raymarched objects and traditional meshes can coexist.
+					if (t >= s) {
 						ret = fixed4(0, 0, 0, 0);
 						break;
 					}
-					float3 p = ro + rd * t;
-					float d = map(p);
 
+					float3 p = ro + rd * t; // World space position of sample
+					float d = map(p);		// Sample of distance field (see map())
+
+					// If the sample <= 0, we have hit something (see map()).
 					if (d < 0.001) {
 						float3 n = calcNormal(p);
-						ret = fixed4(dot(-_LightDir.xyz, n).rrr, 1);
+						ret = fixed4(dot(-_LightDir.xyz, n).rrr, 1); // Basic lambert lighting of directional light.
 						break;
 					}
 
-					t += min(d, s - t);
+					// If the sample > 0, we haven't hit anything yet so we should march forward
+					// We step forward by distance d, because d is the minimum distance possible to intersect
+					// an object (see map()).
+					t += d;
 				}
 
 				return ret;
