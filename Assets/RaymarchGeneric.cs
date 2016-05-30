@@ -44,7 +44,7 @@ public class RaymarchGeneric : MonoBehaviour
         Vector3 pos = CurrentCamera.transform.position;
 
         for (int x = 0; x < 4; x++)
-            Gizmos.DrawLine(pos, pos + (Vector3)corners.GetRow(x));
+            Gizmos.DrawLine(pos, pos + (Vector3)(CurrentCamera.cameraToWorldMatrix * corners.GetRow(x)));
     }
 
     [ImageEffectOpaque]
@@ -78,9 +78,6 @@ public class RaymarchGeneric : MonoBehaviour
     /// Bottom Left corner:  row=3
     private Matrix4x4 GetFrustumCorners(Camera cam)
     {
-        Transform camtr = cam.transform;
-        float camNear = cam.nearClipPlane;
-        float camFar = cam.farClipPlane;
         float camFov = cam.fieldOfView;
         float camAspect = cam.aspect;
 
@@ -90,13 +87,13 @@ public class RaymarchGeneric : MonoBehaviour
 
         float tan_fov = Mathf.Tan(fovWHalf * Mathf.Deg2Rad);
 
-        Vector3 toRight = Vector3.right * camNear * tan_fov * camAspect;
-        Vector3 toTop = Vector3.up * camNear * tan_fov;
+        Vector3 toRight = Vector3.right * tan_fov * camAspect;
+        Vector3 toTop = Vector3.up * tan_fov;
 
-        Vector3 topLeft = (-Vector3.forward * camNear - toRight + toTop);
-        Vector3 topRight = (-Vector3.forward * camNear + toRight + toTop);
-        Vector3 bottomRight = (-Vector3.forward * camNear + toRight - toTop);
-        Vector3 bottomLeft = (-Vector3.forward * camNear - toRight - toTop);
+        Vector3 topLeft = (-Vector3.forward - toRight + toTop);
+        Vector3 topRight = (-Vector3.forward + toRight + toTop);
+        Vector3 bottomRight = (-Vector3.forward + toRight - toTop);
+        Vector3 bottomLeft = (-Vector3.forward - toRight - toTop);
 
         frustumCorners.SetRow(0, topLeft);
         frustumCorners.SetRow(1, topRight);
@@ -143,7 +140,7 @@ public class RaymarchGeneric : MonoBehaviour
 
         GL.MultiTexCoord2(0, 0.0f, 1.0f);
         GL.Vertex3(0.0f, 1.0f, 0.0f); // TL
-
+        
         GL.End();
         GL.PopMatrix();
     }

@@ -18,7 +18,7 @@
 			#include "DistanceFunc.cginc"
 			
 			uniform sampler2D _CameraDepthTexture;
-			// These three are set by our script (see RaymarchGeneric.cs)
+			// These are are set by our script (see RaymarchGeneric.cs)
 			uniform sampler2D _MainTex;
 			uniform float4x4 _CameraInvViewMatrix;
 			uniform float4x4 _FrustumCornersWS;
@@ -54,16 +54,15 @@
 				o.uv.y = 1 - o.uv.y;
 				#endif
 
-				// Get the eyespace view ray
-				o.ray = normalize(_FrustumCornersWS[(int)index].xyz);
+				// Get the eyespace view ray (normalized)
+				o.ray = _FrustumCornersWS[(int)index].xyz;
+				// Dividing by z "normalizes" it in the z axis
+				// Therefore multiplying the ray by some number i gives the viewspace position
+				// of the point on the ray with [viewspace z]=i
 				o.ray /= -o.ray.z;
 
-				// Transform from eyespace to worldspace
-				float4 ray_ws = float4(o.ray, 1.0);
-				ray_ws = mul(ray_ws, _CameraInvViewMatrix);
-				o.ray = ray_ws.xyz;
-
-				
+				// Transform the ray from eyespace to worldspace
+				o.ray = mul(_CameraInvViewMatrix, o.ray);
 
 				return o;
 			}
@@ -159,7 +158,10 @@
 				duv.y = 1 - duv.y;
 				#endif
 
-				// Convert from depth buffer to true distance from camera
+				// Convert from depth buffer (eye space) to true distance from camera
+				// This is done by multiplying the eyespace depth by the length of the "z-normalized"
+				// ray (see vert()).  Think of similar triangles: the view-space z-distance between a point
+				// and the camera is proportional to the absolute distance.
 				float depth = LinearEyeDepth(tex2D(_CameraDepthTexture, duv).r);
 				depth *= length(i.ray);
 
