@@ -3,7 +3,7 @@
 [ExecuteInEditMode]
 [RequireComponent(typeof(Camera))]
 [AddComponentMenu("Effects/Raymarch (Generic)")]
-public class RaymarchGeneric : MonoBehaviour
+public class RaymarchGeneric : SceneViewFilter
 {
     public Transform SunLight;
 

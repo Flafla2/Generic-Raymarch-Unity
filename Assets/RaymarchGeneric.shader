@@ -20,6 +20,7 @@
 			uniform sampler2D _CameraDepthTexture;
 			// These are are set by our script (see RaymarchGeneric.cs)
 			uniform sampler2D _MainTex;
+			uniform float4 _MainTex_TexelSize;
 			uniform float4x4 _CameraInvViewMatrix;
 			uniform float4x4 _FrustumCornersWS;
 			uniform float4 _CameraWS;
@@ -51,7 +52,8 @@
 				o.uv = v.uv.xy;
 				
 				#if UNITY_UV_STARTS_AT_TOP
-				o.uv.y = 1 - o.uv.y;
+				if (_MainTex_TexelSize.y < 0)
+					o.uv.y = 1 - o.uv.y;
 				#endif
 
 				// Get the eyespace view ray (normalized)
@@ -131,7 +133,7 @@
 					float d = map(p);		// Sample of distance field (see map())
 
 					// If the sample <= 0, we have hit something (see map()).
-					if (d < 0.001) {
+					if (d < 0.01) {
 						float3 n = calcNormal(p);
 						ret = fixed4(dot(-_LightDir.xyz, n).rrr, 1); // Basic lambert lighting of directional light.
 						break;
@@ -155,7 +157,8 @@
 
 				float2 duv = i.uv;
 				#if UNITY_UV_STARTS_AT_TOP
-				duv.y = 1 - duv.y;
+				if (_MainTex_TexelSize.y < 0)
+					duv.y = 1 - duv.y;
 				#endif
 
 				// Convert from depth buffer (eye space) to true distance from camera
