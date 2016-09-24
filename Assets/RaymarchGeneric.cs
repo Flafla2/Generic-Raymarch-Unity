@@ -43,8 +43,25 @@ public class RaymarchGeneric : SceneViewFilter
         Matrix4x4 corners = GetFrustumCorners(CurrentCamera);
         Vector3 pos = CurrentCamera.transform.position;
 
-        for (int x = 0; x < 4; x++)
-            Gizmos.DrawLine(pos, pos + (Vector3)(CurrentCamera.cameraToWorldMatrix * corners.GetRow(x)));
+        for (int x = 0; x < 4; x++) {
+            corners.SetRow(x, CurrentCamera.cameraToWorldMatrix * corners.GetRow(x));
+            Gizmos.DrawLine(pos, pos + (Vector3)(corners.GetRow(x)));
+        }
+
+        Gizmos.color = Color.red;
+        int n = 10; // # of intervals
+        for (int x = 1; x < n; x++) {
+            float i_x = (float)x / (float)n;
+
+            var w_top = Vector3.Lerp(corners.GetRow(0), corners.GetRow(1), i_x);
+            var w_bot = Vector3.Lerp(corners.GetRow(3), corners.GetRow(2), i_x);
+            for (int y = 1; y < n; y++) {
+                float i_y = (float)y / (float)n;
+                
+                var w = Vector3.Lerp(w_top, w_bot, i_y).normalized;
+                Gizmos.DrawLine(pos + (Vector3)w, pos + (Vector3)w * 1.2f);
+            }
+        }
     }
 
     [ImageEffectOpaque]
