@@ -99,6 +99,12 @@ float opU(float d1, float d2)
 	return min(d1, d2);
 }
 
+// Union (with material data)
+float2 opU_mat( float2 d1, float2 d2 )
+{
+	return (d1.x<d2.x) ? d1 : d2;
+}
+
 // Subtraction
 float opS(float d1, float d2)
 {

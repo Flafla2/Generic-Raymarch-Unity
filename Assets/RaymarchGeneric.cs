@@ -2,13 +2,21 @@
 
 [ExecuteInEditMode]
 [RequireComponent(typeof(Camera))]
-[AddComponentMenu("Effects/Raymarch (Generic)")]
+[AddComponentMenu("Effects/Raymarch (Generic Complete)")]
 public class RaymarchGeneric : SceneViewFilter
 {
     public Transform SunLight;
 
     [SerializeField]
     private Shader _EffectShader;
+    [SerializeField]
+    private Texture2D _MaterialColorRamp;
+    [SerializeField]
+    private Texture2D _PerfColorRamp;
+    [SerializeField]
+    private float _RaymarchDrawDistance = 40;
+    [SerializeField]
+    private bool _DebugPerformance = false;
 
     public Material EffectMaterial
     {
@@ -48,6 +56,8 @@ public class RaymarchGeneric : SceneViewFilter
             Gizmos.DrawLine(pos, pos + (Vector3)(corners.GetRow(x)));
         }
 
+        /*
+        // UNCOMMENT TO DEBUG RAY DIRECTIONS
         Gizmos.color = Color.red;
         int n = 10; // # of intervals
         for (int x = 1; x < n; x++) {
@@ -62,6 +72,7 @@ public class RaymarchGeneric : SceneViewFilter
                 Gizmos.DrawLine(pos + (Vector3)w, pos + (Vector3)w * 1.2f);
             }
         }
+        */
     }
 
     [ImageEffectOpaque]
@@ -79,7 +90,31 @@ public class RaymarchGeneric : SceneViewFilter
 
         EffectMaterial.SetVector("_LightDir", SunLight ? SunLight.forward : Vector3.down);
 
-        EffectMaterial.SetMatrix("_FrustumCornersWS", GetFrustumCorners(CurrentCamera));
+        // Construct a Model Matrix for the Torus
+        Matrix4x4 MatTorus = Matrix4x4.TRS(
+            Vector3.right * Mathf.Sin(Time.time) * 5, 
+            Quaternion.identity,
+            Vector3.one);
+        MatTorus *= Matrix4x4.TRS(
+            Vector3.zero, 
+            Quaternion.Euler(new Vector3(0, 0, (Time.time * 200) % 360)), 
+            Vector3.one);
+        // Send the torus matrix to our shader
+        EffectMaterial.SetMatrix("_MatTorus_InvModel", MatTorus.inverse);
+
+        EffectMaterial.SetTexture("_ColorRamp_Material", _MaterialColorRamp);
+        EffectMaterial.SetTexture("_ColorRamp_PerfMap", _PerfColorRamp);
+
+        EffectMaterial.SetFloat("_DrawDistance", _RaymarchDrawDistance);
+
+        if(EffectMaterial.IsKeywordEnabled("DEBUG_PERFORMANCE") != _DebugPerformance) {
+            if(_DebugPerformance)
+                EffectMaterial.EnableKeyword("DEBUG_PERFORMANCE");
+            else
+                EffectMaterial.DisableKeyword("DEBUG_PERFORMANCE");
+        }
+
+        EffectMaterial.SetMatrix("_FrustumCornersES", GetFrustumCorners(CurrentCamera));
         EffectMaterial.SetMatrix("_CameraInvViewMatrix", CurrentCamera.cameraToWorldMatrix);
         EffectMaterial.SetVector("_CameraWS", CurrentCamera.transform.position);
 
